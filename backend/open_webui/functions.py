@@ -4,6 +4,8 @@ import inspect
 import json
 
 from pydantic import BaseModel
+import urllib.parse
+from urllib.parse import urlparse
 from typing import AsyncGenerator, Generator, Iterator
 from fastapi import (
     Depends,
@@ -64,6 +66,25 @@ def get_function_module_by_id(request: Request, pipe_id: str):
         function_module.valves = function_module.Valves(**(valves if valves else {}))
     return function_module
 
+
+def get_current_url(request):
+    return urllib.parse.quote(str(request.url), safe='')
+
+def get_current_url_protocol_host(request):
+    parsed_url = urlparse(str(request.url))
+    return f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+def get_back_url(request):
+    return f"{get_current_url_protocol_host(request)}/pubSso"
+
+def get_sso_redirect_url(request, next_url=''):
+    local_next_url = next_url if next_url else get_current_url(request)
+    return f"https://kuauth.kujiale.com/loginpage?backurl={get_back_url(request)}&nexturl={local_next_url}"
+
+def get_cookies_qunhe_token(request):
+    cookies = request.cookies
+    qunhe_token = cookies.get("qunheinternalsso")
+    return qunhe_token
 
 async def get_function_models(request):
     pipes = Functions.get_functions_by_type("pipe", active_only=True)

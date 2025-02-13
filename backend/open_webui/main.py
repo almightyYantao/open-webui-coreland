@@ -11,6 +11,7 @@ import random
 
 from contextlib import asynccontextmanager
 from urllib.parse import urlencode, parse_qs, urlparse
+from open_webui.functions import get_sso_redirect_url
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -967,9 +968,15 @@ async def list_tasks_endpoint(user=Depends(get_verified_user)):
 #
 ##################################
 
-
 @app.get("/api/config")
 async def get_app_config(request: Request):
+
+    # qunheCookie = request.cookies.get("qunheinternalsso")
+    # if qunheCookie == None:
+    #     ## 跳转到登录页面
+    #     log.info("qunheCookie is None: " + get_sso_redirect_url(request))
+    #     return RedirectResponse(url=get_sso_redirect_url(request), status_code=302)
+
     user = None
     if "token" in request.cookies:
         token = request.cookies.get("token")

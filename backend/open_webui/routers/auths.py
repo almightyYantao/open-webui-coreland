@@ -5,6 +5,8 @@ import datetime
 import logging
 from aiohttp import ClientSession
 
+from open_webui.utils.qunhe_sso import parse_token
+from open_webui.functions import get_cookies_qunhe_token, get_sso_redirect_url
 from open_webui.models.auths import (
     AddUserForm,
     ApiKey,
@@ -72,7 +74,7 @@ class SessionUserResponse(Token, UserResponse):
 @router.get("/", response_model=SessionUserResponse)
 async def get_session_user(
     request: Request, response: Response, user=Depends(get_current_user)
-):
+):    
     expires_delta = parse_duration(request.app.state.config.JWT_EXPIRES_IN)
     expires_at = None
     if expires_delta:
@@ -159,6 +161,65 @@ async def update_password(
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_PASSWORD)
     else:
         raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+
+############################
+# SSO Authentication
+############################
+@router.get("/sso_auth", response_model=SessionUserResponse)
+async def sso_auth(request: Request, response: Response):
+    qunhe_token = get_cookies_qunhe_token(request)
+    sso_token = parse_token(qunhe_token)
+    log.info(f"sso_token:${sso_token}")
+    mail = sso_token.ldap + "@qunhemail.com"
+    cn = sso_token.name
+    user = Users.get_user_by_email(mail)
+    if not user:
+        try:
+            role = (
+                "admin"
+                if Users.get_num_users() == 0
+                else request.app.state.config.DEFAULT_USER_ROLE
+            )
+
+            user = Auths.insert_new_auth(
+                email=mail, password=str(uuid.uuid4()), name=cn, role=role
+            )
+
+            if not user:
+                raise HTTPException(
+                    500, detail=ERROR_MESSAGES.CREATE_USER_ERROR
+                )
+
+        except HTTPException:
+            raise
+        except Exception as err:
+            raise HTTPException(500, detail=ERROR_MESSAGES.DEFAULT(err))
+
+    user = Auths.authenticate_user_by_trusted_header(mail)        
+    token = create_token(
+                    data={"id": user.id},
+                    expires_delta=parse_duration(
+                        request.app.state.config.JWT_EXPIRES_IN
+                    ),
+                )
+    response.set_cookie(
+        key="token",
+        value=token,
+        httponly=True,  # Ensures the cookie is not accessible via JavaScript
+    )
+    user_permissions = get_permissions(
+        user.id, request.app.state.config.USER_PERMISSIONS
+    )
+    return {
+        "token": token,
+        "token_type": "Bearer",
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
+        "profile_image_url": user.profile_image_url,
+        "permissions": user_permissions,
+    }
 
 
 ############################
