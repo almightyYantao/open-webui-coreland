@@ -91,13 +91,9 @@ pytube==15.0.0
 
 extract_msg
 pydub
-<<<<<<< HEAD
 duckduckgo-search~=7.3.0
 pycryptodome
 pycryptodomex
-=======
-duckduckgo-search~=7.3.2
->>>>>>> e4d7d41df6d913d33910561090fd5d1afcd997f3
 
 ## Google Drive
 google-api-python-client
