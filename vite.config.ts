@@ -24,6 +24,9 @@ export default defineConfig({
 	build: {
 		sourcemap: true
 	},
+	server: {
+		allowedHosts: ['localhost.qunhequnhe.com']
+	},
 	worker: {
 		format: 'es'
 	}

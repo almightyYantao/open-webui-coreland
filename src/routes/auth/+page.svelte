@@ -8,9 +8,11 @@
 	import { getBackendConfig } from '$lib/apis';
 	import { ldapUserSignIn, getSessionUser, userSignIn, userSignUp } from '$lib/apis/auths';
 
+	// @ts-ignore
 	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 	import { WEBUI_NAME, config, user, socket } from '$lib/stores';
 
+	// @ts-ignore
 	import { generateInitialsImage, canvasPixelTest } from '$lib/utils';
 
 	import Spinner from '$lib/components/common/Spinner.svelte';
@@ -20,6 +22,7 @@
 
 	let loaded = false;
 
+	// @ts-ignore
 	let mode = $config?.features.enable_ldap ? 'ldap' : 'signin';
 
 	let name = '';
@@ -28,6 +31,7 @@
 
 	let ldapUsername = '';
 
+	// @ts-ignore
 	const setSessionUser = async (sessionUser) => {
 		if (sessionUser) {
 			console.log(sessionUser);
@@ -36,6 +40,7 @@
 				localStorage.token = sessionUser.token;
 			}
 
+			// @ts-ignore
 			$socket.emit('user-join', { auth: { token: sessionUser.token } });
 			await user.set(sessionUser);
 			await config.set(await getBackendConfig());
@@ -117,6 +122,7 @@
 		if (($config?.features.auth_trusted_header ?? false) || $config?.features.auth === false) {
 			await signInHandler();
 		} else {
+			// @ts-ignore
 			onboarding = $config?.onboarding ?? false;
 		}
 	});
