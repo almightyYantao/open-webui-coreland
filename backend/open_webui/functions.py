@@ -84,6 +84,8 @@ def get_sso_redirect_url(request, next_url=''):
 def get_cookies_qunhe_token(request):
     cookies = request.cookies
     qunhe_token = cookies.get("qunheinternalsso")
+    if qunhe_token == None:
+        qunhe_token = cookies.get("pubinternalsso")
     return qunhe_token
 
 async def get_function_models(request):

@@ -5,6 +5,7 @@ from Cryptodome.Cipher import DES
 from Cryptodome.Util.Padding import unpad
 from Cryptodome.Protocol.KDF import PBKDF2
 import base64
+from open_webui.env import SRC_LOG_LEVELS
 
 class SsoToken:
     def __init__(self):
@@ -13,7 +14,8 @@ class SsoToken:
         self.name = ""
 
 TOKEN_ENCRYPT_KEY = b"1d6Ltt=r"  # 8 bytes key for DES
-LOG = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
+log.setLevel(SRC_LOG_LEVELS["MAIN"])
 
 def des_decrypt(encrypt_str: str, des_key: bytes) -> str:
     try:
@@ -38,6 +40,7 @@ def des_decrypt(encrypt_str: str, des_key: bytes) -> str:
         return ""
 
 def parse_token(token: str) -> Optional[SsoToken]:
+    log.info(f"token:{token}")
     if not token or token.strip() == "":
         return None
 
@@ -45,11 +48,11 @@ def parse_token(token: str) -> Optional[SsoToken]:
     try:
         val_str = des_decrypt(token, TOKEN_ENCRYPT_KEY)
     except Exception as e:
-        LOG.error("getSessionUserFromCookie", exc_info=True)
+        log.error("getSessionUserFromCookie", exc_info=True)
         return None
 
     vals = val_str.split("-")
-    LOG.info(f"val_str:{val_str}")
+    log.info(f"val_str:{val_str}")
 
     # 3 param: ldap-timestamp-花名
     if len(vals) != 3:
