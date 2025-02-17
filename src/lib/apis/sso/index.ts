@@ -1,9 +1,9 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 
-export const sso_auth_function = async () => {
+export const sso_auth_function = async (token:string) => {
     let error = null;
 
-    const res = await fetch(`${WEBUI_API_BASE_URL}/auths/sso_auth`, {
+    const res = await fetch(`${WEBUI_API_BASE_URL}/auths/sso_auth?token=${encodeURIComponent(token)}`, {
         method: 'GET',
         credentials: 'include',
     })

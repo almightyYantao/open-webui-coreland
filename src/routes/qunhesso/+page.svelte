@@ -33,7 +33,7 @@
 			// Do something with the token
 			console.log('Token:', token);
 			document.cookie = 'qunheinternalsso=' + token + '; path=/; Secure; HttpOnly; SameSite=None';
-			sso_auth_function().then(async (data) => {
+			sso_auth_function(token).then(async (data) => {
 				await setSessionUser(data);
 			});
 			loaded = true;

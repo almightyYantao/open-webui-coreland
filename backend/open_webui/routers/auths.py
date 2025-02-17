@@ -168,6 +168,9 @@ async def update_password(
 @router.get("/sso_auth", response_model=SessionUserResponse)
 async def sso_auth(request: Request, response: Response):
     qunhe_token = get_cookies_qunhe_token(request)
+    if qunhe_token == None:
+        qunhe_token = request.query_params.get("token")
+    log.info(f"qunhe_token:${qunhe_token}")
     sso_token = parse_token(qunhe_token)
     log.info(f"sso_token:${sso_token}")
     mail = sso_token.ldap + "@qunhemail.com"
