@@ -185,7 +185,8 @@ async def sso_auth(request: Request, response: Response):
             )
 
             user = Auths.insert_new_auth(
-                email=mail, password=str(uuid.uuid4()), name=cn, role=role
+                email=mail, password=str(uuid.uuid4()), name=cn, role=role,
+                profile_image_url="//mdm-gateway.qunhequnhe.com/api/v1/mdm/wxwork/avatar/" + sso_token.ldap
             )
 
             if not user:
