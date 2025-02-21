@@ -31,16 +31,13 @@
 
 	let ldapUsername = '';
 
-<<<<<<< HEAD
 	// @ts-ignore
-=======
 	const querystringValue = (key) => {
 		const querystring = window.location.search;
 		const urlParams = new URLSearchParams(querystring);
 		return urlParams.get(key);
 	};
 
->>>>>>> 6fedd72e3973e1d13c9daf540350cd822826bf27
 	const setSessionUser = async (sessionUser) => {
 		if (sessionUser) {
 			console.log(sessionUser);
