@@ -551,22 +551,13 @@
 					} else {
 						// Redirect Invalid Session User to /auth Page
 						localStorage.removeItem('token');
-<<<<<<< HEAD
 						await goto('/qunhesso');
-=======
-						await goto(`/auth?redirect=${encodedUrl}`);
->>>>>>> 63533c9e3ab41edd7bd4124ef94f6b6dc09aa175
 					}
 				} else {
 					// Don't redirect if we're already on the auth page
 					// Needed because we pass in tokens from OAuth logins via URL fragments
-<<<<<<< HEAD
 					if ($page.url.pathname !== '/qunhesso') {
 						await goto('/qunhesso');
-=======
-					if ($page.url.pathname !== '/auth') {
-						await goto(`/auth?redirect=${encodedUrl}`);
->>>>>>> 63533c9e3ab41edd7bd4124ef94f6b6dc09aa175
 					}
 				}
 			}

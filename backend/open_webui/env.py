@@ -105,16 +105,10 @@ for source in log_sources:
 
 log.setLevel(SRC_LOG_LEVELS["CONFIG"])
 
-<<<<<<< HEAD
 
 WEBUI_NAME = os.environ.get("WEBUI_NAME", "Coreland AI")
 # if WEBUI_NAME != "Open WebUI":
 #     WEBUI_NAME += " (Open WebUI)"
-=======
-WEBUI_NAME = os.environ.get("WEBUI_NAME", "Open WebUI")
-if WEBUI_NAME != "Open WebUI":
-    WEBUI_NAME += " (Open WebUI)"
->>>>>>> 63533c9e3ab41edd7bd4124ef94f6b6dc09aa175
 
 WEBUI_FAVICON_URL = "https://openwebui.com/favicon.png"
 

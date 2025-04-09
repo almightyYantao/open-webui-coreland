@@ -116,7 +116,6 @@
 					</Menu>
 				{/if}
 
-<<<<<<< HEAD
 				<button
 					class=" flex cursor-pointer px-2 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-850 transition"
 					style="font-size: 12px;"
@@ -143,21 +142,6 @@
 						</button>
 					</Tooltip>
 				{/if}
-=======
-				<Tooltip content={$i18n.t('Controls')}>
-					<button
-						class=" flex cursor-pointer px-2 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-850 transition"
-						on:click={async () => {
-							await showControls.set(!$showControls);
-						}}
-						aria-label="Controls"
-					>
-						<div class=" m-auto self-center">
-							<AdjustmentsHorizontal className=" size-5" strokeWidth="0.5" />
-						</div>
-					</button>
-				</Tooltip>
->>>>>>> 63533c9e3ab41edd7bd4124ef94f6b6dc09aa175
 
 				<Tooltip content={$i18n.t('New Chat')}>
 					<button
