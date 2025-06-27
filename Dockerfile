@@ -26,12 +26,30 @@ WORKDIR /app
 # 配置 Alpine 和 npm 使用清华源
 RUN echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.20/main" > /etc/apk/repositories && \
     echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.20/community" >> /etc/apk/repositories && \
-    npm config set registry https://registry.npmmirror.com/
+    npm config set registry https://registry.npmmirror.com/ && \
+    npm config set timeout 600000 && \
+    npm config set network-timeout 600000
 
-# to store git revision in build
-RUN apk add --no-cache git
+# 安装工具，包括 proxychains 用于特殊情况
+RUN apk add --no-cache git curl proxychains-ng
+
+# 配置 proxychains（仅在需要时使用）
+RUN echo "strict_chain" > /etc/proxychains.conf && \
+    echo "proxy_dns" >> /etc/proxychains.conf && \
+    echo "tcp_read_time_out 15000" >> /etc/proxychains.conf && \
+    echo "tcp_connect_time_out 8000" >> /etc/proxychains.conf && \
+    echo "[ProxyList]" >> /etc/proxychains.conf && \
+    echo "socks5 10.10.52.137 1088" >> /etc/proxychains.conf
+
 COPY package.json package-lock.json ./
-RUN npm ci
+
+# 先尝试直接安装（使用国内源），失败则忽略脚本
+RUN npm ci --ignore-scripts --unsafe-perm --prefer-offline --no-audit --no-fund || \
+    (echo "Direct install failed, trying with modified package.json..." && \
+     node -e "const pkg=JSON.parse(require('fs').readFileSync('package.json','utf8')); delete pkg.dependencies['onnxruntime-node']; delete pkg.optionalDependencies?.['onnxruntime-node']; require('fs').writeFileSync('package.json',JSON.stringify(pkg,null,2));" && \
+     rm -rf node_modules package-lock.json && \
+     npm install --ignore-scripts --unsafe-perm --no-audit --no-fund)
+
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
@@ -125,42 +143,10 @@ RUN if [ $UID -ne 0 ]; then \
 
 RUN mkdir -p $HOME/.cache/chroma
 RUN echo -n 00000000-0000-0000-0000-000000000000 > $HOME/.cache/chroma/telemetry_user_id
-
-# Make sure the user has access to the app and root directory
 RUN chown -R $UID:$GID /app $HOME
 
-# 安装系统依赖包
+# 安装系统依赖包（包括 proxychains）
 RUN apt-get update && \
-    if [ "$USE_OLLAMA" = "true" ]; then \
-    # Install pandoc and netcat
-    apt-get install -y --no-install-recommends \
-        git \
-        build-essential \
-        pandoc \
-        netcat-openbsd \
-        curl \
-        wget \
-        ca-certificates \
-        gnupg \
-        lsb-release && \
-    apt-get install -y --no-install-recommends gcc python3-dev && \
-    # for RAG OCR
-    apt-get install -y --no-install-recommends \
-        ffmpeg \
-        libsm6 \
-        libxext6 \
-        libxrender-dev \
-        libglib2.0-0 \
-        libfontconfig1 && \
-    # install helper tools
-    apt-get install -y --no-install-recommends curl jq && \
-    # install ollama
-    curl -fsSL https://ollama.com/install.sh | sh && \
-    # cleanup
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
-    else \
-    # Install pandoc, netcat and gcc
     apt-get install -y --no-install-recommends \
         git \
         build-essential \
@@ -170,19 +156,31 @@ RUN apt-get update && \
         curl \
         wget \
         ca-certificates \
-        jq && \
-    apt-get install -y --no-install-recommends gcc python3-dev && \
-    # for RAG OCR
-    apt-get install -y --no-install-recommends \
+        jq \
+        python3-dev \
         ffmpeg \
         libsm6 \
         libxext6 \
         libxrender-dev \
         libglib2.0-0 \
-        libfontconfig1 && \
-    # cleanup
+        libfontconfig1 \
+        proxychains4 && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# 配置 proxychains（仅在需要时使用）
+RUN echo "strict_chain" > /etc/proxychains4.conf && \
+    echo "proxy_dns" >> /etc/proxychains4.conf && \
+    echo "tcp_read_time_out 15000" >> /etc/proxychains4.conf && \
+    echo "tcp_connect_time_out 8000" >> /etc/proxychains4.conf && \
+    echo "[ProxyList]" >> /etc/proxychains4.conf && \
+    echo "socks5 10.10.52.137 1088" >> /etc/proxychains4.conf
+
+# 安装 Ollama（如果需要的话，可以使用代理）
+RUN if [ "$USE_OLLAMA" = "true" ]; then \
+    curl -fsSL https://ollama.com/install.sh | sh || \
+    (echo "Direct download failed, trying with proxy..." && \
+     proxychains4 curl -fsSL https://ollama.com/install.sh | sh); \
     fi
 
 # install python dependencies
@@ -198,9 +196,9 @@ RUN if [ $UID -ne 0 ]; then \
     chown -R $UID:$GID /home/app/.pip; \
     fi
 
+# Python 包安装（主要使用国内源，特殊情况使用代理）
 RUN pip3 install --no-cache-dir uv -i https://pypi.tuna.tsinghua.edu.cn/simple && \
     if [ "$USE_CUDA" = "true" ]; then \
-    # If you use CUDA the whisper and embedding model will be downloaded on first use
     pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/$USE_CUDA_DOCKER_VER --no-cache-dir && \
     uv pip install --system -r requirements.txt --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/simple --timeout 600 && \
     python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')" && \
