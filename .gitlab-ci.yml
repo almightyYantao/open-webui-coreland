@@ -8,32 +8,34 @@ variables:
   PROXY_URL: "socks5://10.10.52.137:1088"
   PLATFORMS: "linux/amd64,linux/arm64"
 
-before_script:
-  # 登录私有仓库
-  - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
-
 build-push:
   stage: build-push
-  image: docker.1ms.run/library/docker:24-cli
+  image: moby/buildkit:latest
   tags:
     - kube-runner
   variables:
     DOCKER_BUILDKIT: 1
-    BUILDKIT_HOST: tcp://buildkitd.buildkit-prod.svc.cluster.local:1234
   script:
-    # 创建并使用buildx构建器
-    - docker buildx create --use --name multiarch --driver remote $BUILDKIT_HOST
+    # 直接创建认证配置，不使用docker login
+    - mkdir -p ~/.docker
+    - echo "{\"auths\":{\"$REGISTRY\":{\"auth\":\"$(echo -n $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD | base64)\"}}}" > ~/.docker/config.json
     
-    # 多平台构建并推送
-    - docker buildx build \
-        --platform $PLATFORMS \
-        --build-arg HTTP_PROXY=$PROXY_URL \
-        --build-arg HTTPS_PROXY=$PROXY_URL \
-        --build-arg ALL_PROXY=$PROXY_URL \
-        --network host \
-        --tag $IMAGE_NAME:$CI_COMMIT_SHA \
-        --tag $IMAGE_NAME:latest \
-        --push .
+    # 验证buildkit连接
+    - buildctl debug info
+    
+    # 使用buildctl构建多平台镜像并推送
+    - buildctl build \
+        --frontend dockerfile.v0 \
+        --local context=. \
+        --local dockerfile=. \
+        --opt platform=$PLATFORMS \
+        --opt build-arg:HTTP_PROXY=$PROXY_URL \
+        --opt build-arg:HTTPS_PROXY=$PROXY_URL \
+        --opt build-arg:ALL_PROXY=$PROXY_URL \
+        --opt network=host \
+        --progress=plain \
+        --output type=image,name=$IMAGE_NAME:$CI_COMMIT_SHA,push=true \
+        --output type=image,name=$IMAGE_NAME:latest,push=true
   only:
     - main
     - develop
