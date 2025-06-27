@@ -13,7 +13,7 @@ variables:
 .default-build-template: &default-build-template
   tags:
     - kube-runner
-  image: docker:24.0.2               # 使用官方 docker 镜像（支持docker CLI）
+  image: docker.taowiki.com/docker:24.0.2               # 使用官方 docker 镜像（支持docker CLI）
   stage: build
   services:
     - docker:dind                   # 启用 Docker-in-Docker 服务，支持构建
