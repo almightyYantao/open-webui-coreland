@@ -26,7 +26,7 @@ WORKDIR /app
 # 配置 Alpine 和 npm 使用清华源
 RUN echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.20/main" > /etc/apk/repositories && \
     echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.20/community" >> /etc/apk/repositories && \
-    npm config set registry https://registry.npmmirror.com/
+    npm config set registry https://mirrors.tuna.tsinghua.edu.cn/
 
 # to store git revision in build
 RUN apk add --no-cache git
