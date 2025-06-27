@@ -20,7 +20,7 @@ variables:
     # 准备 buildx builder，如果已存在就使用
     - |
       if ! docker buildx inspect mybuilder >/dev/null 2>&1; then
-        docker buildx create --use --name mybuilder
+        docker buildx create --use --name mybuilder --buildkitd-flags '--oci-worker-image docker.1ms.run/moby/buildkit:buildx-stable-1'
       else
         docker buildx use mybuilder
       fi
