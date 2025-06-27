@@ -1,4 +1,4 @@
-# syntax=registry.cn-hangzhou.aliyuncs.com/docker/dockerfile:1
+# syntax=docker.1ms.run/docker/dockerfile:1
 # Initialize device type args
 # use build args in the docker build command with --build-arg="BUILDARG=true"
 ARG USE_CUDA=false
