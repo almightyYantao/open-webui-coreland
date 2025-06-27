@@ -15,6 +15,9 @@ variables:
   image: docker.1ms.run/library/docker:24.0.2
   stage: build
   before_script:
+    - echo "http://mirrors.aliyun.com/alpine/v3.18/main" > /etc/apk/repositories
+    - echo "http://mirrors.aliyun.com/alpine/v3.18/community" >> /etc/apk/repositories
+    - apk update
     - apk add --no-cache curl jq bash
     - docker info
     # 准备 buildx builder，如果已存在就使用
