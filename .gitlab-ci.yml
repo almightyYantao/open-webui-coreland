@@ -25,7 +25,7 @@ variables:
   before_script:
     - apk add --no-cache curl jq bash
     - docker info
-    # 设置并启动 buildx builder，多平台构建所需
+    # 设置并启动 buildx builder，多平台构建所
     - |
       if ! docker buildx inspect mybuilder >/dev/null 2>&1; then
         docker buildx create --use --name mybuilder
