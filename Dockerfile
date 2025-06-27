@@ -29,8 +29,7 @@ WORKDIR /app
 # to store git revision in build
 RUN apk add --no-cache git
 
-COPY package.json package-lock.json ./
-RUN rm -rf node_modules package-lock.json
+COPY package.json ./
 RUN npm i
 
 COPY . .
