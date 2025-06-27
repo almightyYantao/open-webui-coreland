@@ -40,12 +40,13 @@ build-main-image:
   script:
     - echo "Building main image for platforms ${PLATFORMS} ..."
     - |
-      TAGS=$(cat VERSION)     # 假设你用 VERSION 文件存版本号，或者改成读取 package.json 等
+      VERSION=$(jq -r '.version' package.json)
+      echo "Read version from package.json: $VERSION"
       docker buildx build \
         --platform ${PLATFORMS} \
         --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
         --tag $IMAGE_NAME:latest \
-        --tag $IMAGE_NAME:$CI_COMMIT_REF_NAME \
+        --tag $IMAGE_NAME:$VERSION \
         --push \
         --cache-from type=registry,ref=$IMAGE_NAME:cache \
         --cache-to type=registry,ref=$IMAGE_NAME:cache,mode=max \
