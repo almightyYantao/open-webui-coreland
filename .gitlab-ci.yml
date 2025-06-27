@@ -24,16 +24,24 @@ variables:
     # 检查 Docker 连接
     - docker info
     
-    # 设置 buildx
+    # 设置 buildx - 使用你的镜像源
     - docker buildx version
-    - docker buildx create --use --name mybuilder --buildkitd-flags '--oci-worker-image docker.1ms.run/moby/buildkit:buildx-stable-1' --driver docker-container || docker buildx use mybuilder
+    - |
+      if ! docker buildx inspect mybuilder >/dev/null 2>&1; then
+        docker buildx create \
+          --use \
+          --name mybuilder \
+          --driver docker-container \
+          --buildkitd-flags '--oci-worker-image docker.1ms.run/moby/buildkit:buildx-stable-1'
+      else
+        docker buildx use mybuilder
+      fi
     - docker buildx inspect --bootstrap
     
     # 登录镜像仓库
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
   after_script:
     - docker logout $REGISTRY || true
-    - docker buildx rm mybuilder || true
 
 build-main-image:
   <<: *default-build-template
@@ -131,30 +139,3 @@ build-release-image:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
       when: on_success
-
-# 可选：构建特定分支的测试镜像
-build-feature-image:
-  <<: *default-build-template
-  script:
-    - echo "Building feature branch image..."
-    - BRANCH_NAME=$(echo $CI_COMMIT_REF_NAME | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
-    - VERSION=$(jq -r '.version' package.json)
-    - TAG_NAME="$VERSION-$BRANCH_NAME-$CI_COMMIT_SHORT_SHA"
-    - echo "Feature image tag:$TAG_NAME"
-    - |
-      docker buildx build \
-        --platform ${PLATFORMS} \
-        --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
-        --label "org.opencontainers.image.version=$TAG_NAME" \
-        --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-        --label "org.opencontainers.image.description=Feature branch build" \
-        --tag $IMAGE_NAME:$TAG_NAME \
-        --push \
-        --cache-from type=registry,ref=$IMAGE_NAME:cache \
-        --progress=plain \
-        .
-    - echo "✅ Feature image build completed:$IMAGE_NAME:$TAG_NAME"
-  rules:
-    - if: '$CI_COMMIT_BRANCH != "main" && $CI_COMMIT_BRANCH != "dev" && $CI_COMMIT_TAG == null'
-      when: manual
-      allow_failure: true
