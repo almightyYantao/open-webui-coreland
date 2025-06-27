@@ -10,7 +10,7 @@ variables:
 
 build-push:
   stage: build-push
-  image: moby/buildkit:latest
+  image: docker.1ms.run/moby/buildkit:latest
   tags:
     - kube-runner
   variables:
