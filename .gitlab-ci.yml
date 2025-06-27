@@ -10,35 +10,36 @@ variables:
 
 build-push:
   stage: build-push
-  image: docker.1ms.run/moby/buildkit:latest
+  image: moby/buildkit:latest
   tags:
     - kube-runner
   variables:
     DOCKER_BUILDKIT: 1
-  before_script:
-    # 检查文件是否存在
-    - ls -la
-    - ls -la Dockerfile || echo "Dockerfile not found"
-    - ls -la package.json || echo "package.json not found"
-    
-    # 从package.json获取版本
-    - apk add --no-cache jq
-    - export VERSION=$(cat package.json | jq -r '.version')
-    - echo "Building version $VERSION"
+    BUILDKIT_HOST: tcp://buildkitd.buildkit-prod.svc.cluster.local:1234
   script:
+    # 调试信息
+    - echo "Current directory:$(pwd)"
+    - echo "BUILDKIT_HOST:$BUILDKIT_HOST"
+    - ls -la
+    - head -5 Dockerfile
+    
+    # 获取版本
+    - apk add --no-cache jq
+    - VERSION=$(jq -r '.version' package.json)
+    - echo "Version:$VERSION"
+    
     # 创建认证配置
     - mkdir -p ~/.docker
     - echo "{\"auths\":{\"$REGISTRY\":{\"auth\":\"$(echo -n $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD | base64)\"}}}" > ~/.docker/config.json
     
-    # 验证buildkit连接
-    - buildctl debug info
+    # 使用 --addr 参数指定远程buildkit
+    - buildctl --addr $BUILDKIT_HOST debug info
     
-    # 使用buildctl构建多平台镜像并推送（修复dockerfile路径）
-    - buildctl build \
+    # 构建镜像
+    - buildctl --addr $BUILDKIT_HOST build \
         --frontend dockerfile.v0 \
         --local context=. \
         --local dockerfile=. \
-        --opt filename=./Dockerfile \
         --opt platform=$PLATFORMS \
         --opt build-arg:HTTP_PROXY=$PROXY_URL \
         --opt build-arg:HTTPS_PROXY=$PROXY_URL \
