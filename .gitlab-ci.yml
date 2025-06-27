@@ -1,6 +1,5 @@
 stages:
   - build
-  - merge
 
 variables:
   IMAGE_NAME: "registry.qunhequnhe.com/itsystem/open-webui"
@@ -8,6 +7,7 @@ variables:
   PLATFORMS: "linux/amd64,linux/arm64"
   DOCKER_HOST: unix:///var/run/docker.sock
   DOCKER_TLS_CERTDIR: ""
+  DOCKER_CLI_EXPERIMENTAL: enabled
 
 .default-build-template: &default-build-template
   tags:
@@ -15,40 +15,54 @@ variables:
   image: docker.1ms.run/library/docker:24.0.2
   stage: build
   before_script:
+    # 配置 Alpine 镜像源
     - echo "http://mirrors.aliyun.com/alpine/v3.18/main" > /etc/apk/repositories
     - echo "http://mirrors.aliyun.com/alpine/v3.18/community" >> /etc/apk/repositories
     - apk update
     - apk add --no-cache curl jq bash
+    
+    # 检查 Docker 连接
     - docker info
-    # 准备 buildx builder，如果已存在就使用
-    - |
-      if ! docker buildx inspect mybuilder >/dev/null 2>&1; then
-        docker buildx create --use --name mybuilder --buildkitd-flags '--oci-worker-image docker.1ms.run/moby/buildkit:buildx-stable-1'
-      else
-        docker buildx use mybuilder
-      fi
+    
+    # 设置 buildx
+    - docker buildx version
+    - docker buildx create --use --name mybuilder --buildkitd-flags '--oci-worker-image docker.1ms.run/moby/buildkit:buildx-stable-1' --driver docker-container || docker buildx use mybuilder
     - docker buildx inspect --bootstrap
+    
+    # 登录镜像仓库
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
   after_script:
-    - docker logout $REGISTRY
+    - docker logout $REGISTRY || true
+    - docker buildx rm mybuilder || true
 
 build-main-image:
   <<: *default-build-template
   script:
     - echo "Building main image for platforms ${PLATFORMS} ..."
     - VERSION=$(jq -r '.version' package.json)
+    - echo "Building version:$VERSION"
+    - echo "Image will be tagged as:"
+    - echo "  - $IMAGE_NAME:latest"
+    - echo "  - $IMAGE_NAME:$VERSION"
     - |
       docker buildx build \
         --platform ${PLATFORMS} \
         --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
+        --label "org.opencontainers.image.version=$VERSION" \
+        --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
         --tag $IMAGE_NAME:latest \
         --tag $IMAGE_NAME:$VERSION \
         --push \
         --cache-from type=registry,ref=$IMAGE_NAME:cache \
         --cache-to type=registry,ref=$IMAGE_NAME:cache,mode=max \
+        --progress=plain \
         .
+    - echo "✅ Main image build completed successfully"
+    - docker buildx imagetools inspect $IMAGE_NAME:latest
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "dev"'
       when: on_success
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
       when: on_success
@@ -58,39 +72,89 @@ build-cuda-image:
   script:
     - echo "Building CUDA image for platforms ${PLATFORMS} ..."
     - VERSION=$(jq -r '.version' package.json)
+    - echo "Building CUDA version:$VERSION"
+    - echo "Image will be tagged as:"
+    - echo "  - $IMAGE_NAME:cuda-latest"
+    - echo "  - $IMAGE_NAME:cuda-$VERSION"
     - |
       docker buildx build \
         --platform ${PLATFORMS} \
         --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
+        --label "org.opencontainers.image.version=$VERSION" \
+        --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+        --label "org.opencontainers.image.description=CUDA-enabled build" \
         --tag $IMAGE_NAME:cuda-latest \
         --tag $IMAGE_NAME:cuda-$VERSION \
         --push \
         --cache-from type=registry,ref=$IMAGE_NAME:cuda-cache \
         --cache-to type=registry,ref=$IMAGE_NAME:cuda-cache,mode=max \
         --build-arg USE_CUDA=true \
+        --progress=plain \
         .
+    - echo "✅ CUDA image build completed successfully"
+    - docker buildx imagetools inspect $IMAGE_NAME:cuda-latest
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "dev"'
       when: on_success
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
       when: on_success
 
-merge-main-image:
-  tags:
-    - kube-runner
-  image: docker.1ms.run/library/docker:24.0.2
-  stage: merge
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
+# 可选：仅在发布标签时构建发布版本
+build-release-image:
+  <<: *default-build-template
   script:
-    - echo "Merging manifests for multi-arch image..."
+    - echo "Building release image for tag ${CI_COMMIT_TAG} ..."
+    - VERSION=${CI_COMMIT_TAG#v}  # 移除 v 前缀
+    - echo "Release version:$VERSION"
+    - echo "Image will be tagged as:"
+    - echo "  - $IMAGE_NAME:$VERSION"
+    - echo "  - $IMAGE_NAME:stable"
     - |
-      docker buildx imagetools create \
-        --tag $IMAGE_NAME:latest \
-        --tag $IMAGE_NAME:amd64-latest \
-        --tag $IMAGE_NAME:arm64-latest
-    - docker buildx imagetools inspect $IMAGE_NAME:latest
-  needs:
-    - build-main-image
+      docker buildx build \
+        --platform ${PLATFORMS} \
+        --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
+        --label "org.opencontainers.image.version=$VERSION" \
+        --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+        --label "org.opencontainers.image.title=Open WebUI" \
+        --tag $IMAGE_NAME:$VERSION \
+        --tag $IMAGE_NAME:stable \
+        --push \
+        --cache-from type=registry,ref=$IMAGE_NAME:cache \
+        --cache-to type=registry,ref=$IMAGE_NAME:cache,mode=max \
+        --progress=plain \
+        .
+    - echo "✅ Release image build completed successfully"
+    - docker buildx imagetools inspect $IMAGE_NAME:$VERSION
+    - docker buildx imagetools inspect $IMAGE_NAME:stable
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+      when: on_success
+
+# 可选：构建特定分支的测试镜像
+build-feature-image:
+  <<: *default-build-template
+  script:
+    - echo "Building feature branch image..."
+    - BRANCH_NAME=$(echo $CI_COMMIT_REF_NAME | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+    - VERSION=$(jq -r '.version' package.json)
+    - TAG_NAME="$VERSION-$BRANCH_NAME-$CI_COMMIT_SHORT_SHA"
+    - echo "Feature image tag:$TAG_NAME"
+    - |
+      docker buildx build \
+        --platform ${PLATFORMS} \
+        --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
+        --label "org.opencontainers.image.version=$TAG_NAME" \
+        --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+        --label "org.opencontainers.image.description=Feature branch build" \
+        --tag $IMAGE_NAME:$TAG_NAME \
+        --push \
+        --cache-from type=registry,ref=$IMAGE_NAME:cache \
+        --progress=plain \
+        .
+    - echo "✅ Feature image build completed:$IMAGE_NAME:$TAG_NAME"
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "main" && $CI_COMMIT_BRANCH != "dev" && $CI_COMMIT_TAG == null'
+      when: manual
+      allow_failure: true
