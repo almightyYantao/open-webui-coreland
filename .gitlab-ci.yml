@@ -1,5 +1,6 @@
 # .gitlab-ci.yml
 
+
 stages:
   - build
   - merge
@@ -10,6 +11,8 @@ variables:
   PLATFORMS: "linux/amd64,linux/arm64"
 
 .default-build-template: &default-build-template
+  tags:
+    - kube-runner
   image: docker:24.0.2               # 使用官方 docker 镜像（支持docker CLI）
   stage: build
   services:
@@ -80,6 +83,8 @@ build-cuda-image:
 
 # 合并多平台镜像的 manifest（如果有需要）
 merge-main-image:
+  tags:
+    - kube-runner
   image: docker:24.0.2
   stage: merge
   services:
