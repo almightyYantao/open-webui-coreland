@@ -14,7 +14,7 @@ before_script:
 
 build-push:
   stage: build-push
-  image: docker:24-cli
+  image: docker.1ms.run/library/docker:24-cli
   tags:
     - kube-runner
   variables:
