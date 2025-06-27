@@ -5,9 +5,8 @@ variables:
   IMAGE_NAME: "registry.qunhequnhe.com/itsystem/open-webui"
   REGISTRY: "registry.qunhequnhe.com"
   PLATFORMS: "linux/amd64,linux/arm64"
-  DOCKER_HOST: unix:///var/run/docker.sock
-  DOCKER_TLS_CERTDIR: ""
   DOCKER_CLI_EXPERIMENTAL: enabled
+  BUILDKIT_HOST: tcp://buildkitd.buildkit-prod.svc.cluster.local:1234
 
 .default-build-template: &default-build-template
   tags:
@@ -21,27 +20,66 @@ variables:
     - apk update
     - apk add --no-cache curl jq bash
     
-    # 检查 Docker 连接
-    - docker info
+    # 测试远程 BuildKit 连接
+    - echo "Testing connection to remote BuildKit daemon..."
+    - |
+      if timeout 10 nc -z buildkitd.buildkit-prod.svc.cluster.local 1234; then
+        echo "✅ Remote BuildKit daemon is reachable"
+        USE_REMOTE_BUILDKIT=true
+      else
+        echo "⚠️  Remote BuildKit daemon not reachable, falling back to local Docker"
+        USE_REMOTE_BUILDKIT=false
+      fi
     
-    # 设置 buildx - 使用你的镜像源
+    # 设置 buildx
     - docker buildx version
     - |
-      if ! docker buildx inspect mybuilder >/dev/null 2>&1; then
+      # 清理可能存在的 builder
+      docker buildx rm mybuilder || true
+      
+      if [ "$USE_REMOTE_BUILDKIT" = "true" ]; then
+        echo "Setting up remote BuildKit builder..."
+        docker buildx create \
+          --use \
+          --name mybuilder \
+          --driver remote \
+          $BUILDKIT_HOST
+      else
+        echo "Setting up local Docker builder (fallback)..."
+        # 需要 Docker socket 时才设置
+        export DOCKER_HOST=unix:///var/run/docker.sock
+        export DOCKER_TLS_CERTDIR=""
+        docker info
         docker buildx create \
           --use \
           --name mybuilder \
           --driver docker-container \
           --buildkitd-flags '--oci-worker-image docker.1ms.run/moby/buildkit:buildx-stable-1'
-      else
-        docker buildx use mybuilder
       fi
-    - docker buildx inspect --bootstrap
     
-    # 登录镜像仓库
+    # 启动并检查 builder
+    - |
+      for i in {1..3}; do
+        echo "Attempting to bootstrap builder (attempt $i/3)..."
+        if docker buildx inspect --bootstrap mybuilder; then
+          echo "✅ Builder bootstrapped successfully"
+          docker buildx ls
+          break
+        else
+          echo "❌ Bootstrap failed, retrying in 10 seconds..."
+          sleep 10
+        fi
+        if [ $i -eq 3 ]; then
+          echo "❌ Failed to bootstrap builder after 3 attempts"
+          exit 1
+        fi
+      done
+    
+    # 登录镜像仓库（只有在使用 registry 推送时需要）
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
   after_script:
     - docker logout $REGISTRY || true
+    - docker buildx rm mybuilder || true
 
 build-main-image:
   <<: *default-build-template
@@ -52,6 +90,8 @@ build-main-image:
     - echo "Image will be tagged as:"
     - echo "  - $IMAGE_NAME:latest"
     - echo "  - $IMAGE_NAME:$VERSION"
+    - echo "Current builder info:"
+    - docker buildx inspect mybuilder
     - |
       docker buildx build \
         --platform ${PLATFORMS} \
@@ -84,6 +124,8 @@ build-cuda-image:
     - echo "Image will be tagged as:"
     - echo "  - $IMAGE_NAME:cuda-latest"
     - echo "  - $IMAGE_NAME:cuda-$VERSION"
+    - echo "Current builder info:"
+    - docker buildx inspect mybuilder
     - |
       docker buildx build \
         --platform ${PLATFORMS} \
@@ -109,16 +151,46 @@ build-cuda-image:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
       when: on_success
 
-# 可选：仅在发布标签时构建发布版本
+# 纯远程 BuildKit 版本（无回退，性能更好）
+.remote-only-template: &remote-only-template
+  tags:
+    - kube-runner
+  image: docker.1ms.run/library/docker:24.0.2
+  stage: build
+  before_script:
+    # 配置 Alpine 镜像源
+    - echo "http://mirrors.aliyun.com/alpine/v3.18/main" > /etc/apk/repositories
+    - echo "http://mirrors.aliyun.com/alpine/v3.18/community" >> /etc/apk/repositories
+    - apk update
+    - apk add --no-cache curl jq bash
+    
+    # 直接使用远程 BuildKit（无回退）
+    - echo "🚀 Using remote BuildKit daemon..."
+    - docker buildx version
+    - docker buildx rm mybuilder || true
+    - |
+      docker buildx create \
+        --use \
+        --name mybuilder \
+        --driver remote \
+        $BUILDKIT_HOST
+    - docker buildx inspect --bootstrap mybuilder
+    - docker buildx ls
+    
+    # 登录镜像仓库
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
+  after_script:
+    - docker logout $REGISTRY || true
+    - docker buildx rm mybuilder || true
+
 build-release-image:
-  <<: *default-build-template
+  <<: *remote-only-template
   script:
     - echo "Building release image for tag ${CI_COMMIT_TAG} ..."
-    - VERSION=${CI_COMMIT_TAG#v}  # 移除 v 前缀
+    - VERSION=${CI_COMMIT_TAG#v}
     - echo "Release version:$VERSION"
-    - echo "Image will be tagged as:"
-    - echo "  - $IMAGE_NAME:$VERSION"
-    - echo "  - $IMAGE_NAME:stable"
+    - echo "Using remote BuildKit for better performance"
+    - docker buildx inspect mybuilder
     - |
       docker buildx build \
         --platform ${PLATFORMS} \
@@ -134,8 +206,6 @@ build-release-image:
         --progress=plain \
         .
     - echo "✅ Release image build completed successfully"
-    - docker buildx imagetools inspect $IMAGE_NAME:$VERSION
-    - docker buildx imagetools inspect $IMAGE_NAME:stable
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
       when: on_success
