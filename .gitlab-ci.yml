@@ -75,9 +75,6 @@ build-push:
     - |
       docker buildx build \
         --platform $PLATFORMS \
-        --build-arg HTTP_PROXY=$PROXY_URL \
-        --build-arg HTTPS_PROXY=$PROXY_URL \
-        --build-arg ALL_PROXY=$PROXY_URL \
         --tag $IMAGE_NAME:$CI_COMMIT_SHA \
         --tag $IMAGE_NAME:latest \
         --tag $IMAGE_NAME:$VERSION \
