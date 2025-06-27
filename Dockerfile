@@ -30,8 +30,8 @@ RUN echo "https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.20/main" > /etc/apk/rep
 
 # to store git revision in build
 RUN apk add --no-cache git
-COPY package.json ./
-RUN npm i
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
