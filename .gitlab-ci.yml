@@ -12,7 +12,7 @@ variables:
 .default-build-template: &default-build-template
   tags:
     - kube-runner
-  image: docker:24.0.2
+  image: docker.1ms.run/library/docker:24.0.2
   stage: build
   before_script:
     - apk add --no-cache curl jq bash
@@ -75,7 +75,7 @@ build-cuda-image:
 merge-main-image:
   tags:
     - kube-runner
-  image: docker:24.0.2
+  image: docker.1ms.run/library/docker:24.0.2
   stage: merge
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
