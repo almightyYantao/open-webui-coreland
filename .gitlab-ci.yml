@@ -6,23 +6,18 @@ variables:
   IMAGE_NAME: "registry.qunhequnhe.com/itsystem/open-webui"
   REGISTRY: "registry.qunhequnhe.com"
   PLATFORMS: "linux/amd64,linux/arm64"
+  DOCKER_HOST: unix:///var/run/docker.sock
+  DOCKER_TLS_CERTDIR: ""
 
 .default-build-template: &default-build-template
   tags:
     - kube-runner
-  image: docker.1ms.run/library/docker:24.0.2
+  image: docker:24.0.2
   stage: build
-  services:
-    - name: docker.1ms.run/library/docker:dind
-      alias: docker
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: ""
-    DOCKER_HOST: tcp://docker:2375
   before_script:
     - apk add --no-cache curl jq bash
     - docker info
-    # 准备 buildx builder，支持多平台构建
+    # 准备 buildx builder，如果已存在就使用
     - |
       if ! docker buildx inspect mybuilder >/dev/null 2>&1; then
         docker buildx create --use --name mybuilder
@@ -38,9 +33,8 @@ build-main-image:
   <<: *default-build-template
   script:
     - echo "Building main image for platforms ${PLATFORMS} ..."
+    - VERSION=$(jq -r '.version' package.json)
     - |
-      VERSION=$(jq -r '.version' package.json)
-      echo "Read version from package.json: $VERSION"
       docker buildx build \
         --platform ${PLATFORMS} \
         --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
@@ -60,8 +54,8 @@ build-cuda-image:
   <<: *default-build-template
   script:
     - echo "Building CUDA image for platforms ${PLATFORMS} ..."
+    - VERSION=$(jq -r '.version' package.json)
     - |
-      VERSION=$(jq -r '.version' package.json)
       docker buildx build \
         --platform ${PLATFORMS} \
         --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
@@ -78,35 +72,22 @@ build-cuda-image:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
       when: on_success
 
-# 你可以继续类似地定义 build-cuda126-image, build-ollama-image 等 Job
-
 merge-main-image:
   tags:
     - kube-runner
-  image: docker.1ms.run/library/docker:24.0.2
+  image: docker:24.0.2
   stage: merge
-  services:
-    - name: docker.1ms.run/library/docker:dind
-      alias: docker
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_TLS_CERTDIR: ""
-    DOCKER_HOST: tcp://docker:2375
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
   script:
     - echo "Merging manifests for multi-arch image..."
     - |
-      docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $REGISTRY
-
-      # 注意：buildx imagetools create 的参数是镜像的完整tag列表，这里我们用latest和具体版本tag
       docker buildx imagetools create \
         --tag $IMAGE_NAME:latest \
         --tag $IMAGE_NAME:amd64-latest \
         --tag $IMAGE_NAME:arm64-latest
-
     - docker buildx imagetools inspect $IMAGE_NAME:latest
   needs:
     - build-main-image
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
-
-# 可以类似地定义 merge-cuda-image，merge-cuda126-image，merge-ollama-image 等 Job
