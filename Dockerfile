@@ -11,33 +11,35 @@ ARG USE_CUDA_VER=cu128
 # IMPORTANT: If you change the embedding model (sentence-transformers/all-MiniLM-L6-v2) and vice versa, you aren't able to use RAG Chat with your previous documents loaded in the WebUI! You need to re-embed them.
 ARG USE_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ARG USE_RERANKING_MODEL=""
-
 # Tiktoken encoding name; models to use can be found at https://huggingface.co/models?library=tiktoken
 ARG USE_TIKTOKEN_ENCODING_NAME="cl100k_base"
-
 ARG BUILD_HASH=dev-build
 # Override at your own risk - non-root configurations are untested
 ARG UID=0
 ARG GID=0
 
 ######## WebUI frontend ########
-FROM --platform=$BUILDPLATFORM node:22-alpine3.20 AS build
+FROM --platform=$BUILDPLATFORM docker.1ms.run/library/node:22-alpine3.20 AS build
 ARG BUILD_HASH
-
 WORKDIR /app
+
+# 配置npm国内源
+RUN npm config set registry https://registry.npmmirror.com/
 
 # to store git revision in build
 RUN apk add --no-cache git
-
-COPY package.json ./
-RUN npm i
-
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
 
 ######## WebUI backend ########
-FROM python:3.11-slim-bookworm AS base
+FROM docker.1ms.run/library/python:3.11-slim-bookworm AS base
+
+# 配置pip国内源
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && \
+    pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
 # Use args
 ARG USE_CUDA
@@ -88,12 +90,11 @@ ENV HF_HOME="/app/backend/data/cache/embedding/models"
 
 ## Torch Extensions ##
 # ENV TORCH_EXTENSIONS_DIR="/.cache/torch_extensions"
-
 #### Other models ##########################################################
 
 WORKDIR /app/backend
-
 ENV HOME=/root
+
 # Create user and group if not root
 RUN if [ $UID -ne 0 ]; then \
     if [ $GID -ne 0 ]; then \
@@ -134,7 +135,6 @@ RUN if [ "$USE_OLLAMA" = "true" ]; then \
 
 # install python dependencies
 COPY --chown=$UID:$GID ./backend/requirements.txt ./requirements.txt
-
 RUN pip3 install --no-cache-dir uv && \
     if [ "$USE_CUDA" = "true" ]; then \
     # If you use CUDA the whisper and embedding model will be downloaded on first use
@@ -152,8 +152,6 @@ RUN pip3 install --no-cache-dir uv && \
     fi; \
     chown -R $UID:$GID /app/backend/data/
 
-
-
 # copy embedding weight from build
 # RUN mkdir -p /root/.cache/chroma/onnx_models/all-MiniLM-L6-v2
 # COPY --from=build /app/onnx /root/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx
@@ -167,13 +165,10 @@ COPY --chown=$UID:$GID --from=build /app/package.json /app/package.json
 COPY --chown=$UID:$GID ./backend .
 
 EXPOSE 8080
-
 HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT:-8080}/health | jq -ne 'input.status == true' || exit 1
 
 USER $UID:$GID
-
 ARG BUILD_HASH
 ENV WEBUI_BUILD_VERSION=${BUILD_HASH}
 ENV DOCKER=true
-
 CMD [ "bash", "start.sh"]

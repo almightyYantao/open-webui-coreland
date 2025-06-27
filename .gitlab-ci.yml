@@ -43,9 +43,6 @@ build-push:
         --use \
         --name remote-builder \
         --driver remote \
-        --driver-opt env.HTTP_PROXY=$PROXY_URL \
-        --driver-opt env.HTTPS_PROXY=$PROXY_URL \
-        --driver-opt env.ALL_PROXY=$PROXY_URL \
         $BUILDKIT_HOST
     
     # 启动并检查 builder
