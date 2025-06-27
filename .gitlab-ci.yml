@@ -72,7 +72,8 @@ build-push:
     - docker buildx inspect remote-builder --bootstrap
     
     # 多平台构建并推送
-    - docker buildx build \
+    - |
+      docker buildx build \
         --platform $PLATFORMS \
         --build-arg HTTP_PROXY=$PROXY_URL \
         --build-arg HTTPS_PROXY=$PROXY_URL \
