@@ -16,7 +16,8 @@ variables:
   image: docker.1ms.run/library/docker:24.0.2               # 使用官方 docker 镜像（支持docker CLI）
   stage: build
   services:
-    - docker.1ms.run/library/docker:dind                   # 启用 Docker-in-Docker 服务，支持构建
+    - name: docker.1ms.run/library/docker:dind
+      alias: docker
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: ""          # 关闭证书默认环境，简化配置（仅测试环境可行）
@@ -89,7 +90,8 @@ merge-main-image:
   image: docker.1ms.run/library/docker:24.0.2
   stage: merge
   services:
-    - docker.1ms.run/library/docker:dind
+    - name: docker.1ms.run/library/docker:dind
+      alias: docker
   script:
     - echo "Merging manifests for multi-arch image..."
     - |
