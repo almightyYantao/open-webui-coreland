@@ -6,8 +6,8 @@ stages:
   - merge
 
 variables:
-  IMAGE_NAME: "$CI_REGISTRY_IMAGE"        # GitLab 容器注册表镜像名，自动包含项目路径
-  REGISTRY: "$CI_REGISTRY"
+  IMAGE_NAME: "registry.qunhequnhe.com/itsystem/open-webui"
+  REGISTRY: "registry.qunhequnhe.com"
   PLATFORMS: "linux/amd64,linux/arm64"
 
 .default-build-template: &default-build-template
