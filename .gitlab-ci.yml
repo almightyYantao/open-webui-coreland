@@ -10,45 +10,35 @@ variables:
 
 build-push:
   stage: build-push
-  image: docker.1ms.run/moby/buildkit:latest
+  image: docker.1ms.run/library/docker:24-cli
   tags:
     - kube-runner
-  variables:
-    DOCKER_BUILDKIT: 1
-    BUILDKIT_HOST: tcp://buildkitd.buildkit-prod.svc.cluster.local:1234
-  script:
-    # 调试信息
-    - echo "Current directory:$(pwd)"
-    - echo "BUILDKIT_HOST:$BUILDKIT_HOST"
-    - ls -la
-    - head -5 Dockerfile
-    
-    # 获取版本
+  before_script:
+    # 安装jq获取版本
     - apk add --no-cache jq
     - VERSION=$(jq -r '.version' package.json)
-    - echo "Version:$VERSION"
+    - echo "Building version:$VERSION"
     
-    # 创建认证配置
-    - mkdir -p ~/.docker
-    - echo "{\"auths\":{\"$REGISTRY\":{\"auth\":\"$(echo -n $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD | base64)\"}}}" > ~/.docker/config.json
+    # 登录私有仓库
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $REGISTRY
+  script:
+    # 创建使用远程buildkit的构建器
+    - docker buildx create --use --name remote-builder --driver remote $BUILDKIT_HOST
     
-    # 使用 --addr 参数指定远程buildkit
-    - buildctl --addr $BUILDKIT_HOST debug info
+    # 验证构建器
+    - docker buildx ls
+    - docker buildx inspect remote-builder --bootstrap
     
-    # 构建镜像
-    - buildctl --addr $BUILDKIT_HOST build \
-        --frontend dockerfile.v0 \
-        --local context=. \
-        --local dockerfile=. \
-        --opt platform=$PLATFORMS \
-        --opt build-arg:HTTP_PROXY=$PROXY_URL \
-        --opt build-arg:HTTPS_PROXY=$PROXY_URL \
-        --opt build-arg:ALL_PROXY=$PROXY_URL \
-        --opt network=host \
-        --progress=plain \
-        --output type=image,name=$IMAGE_NAME:$CI_COMMIT_SHA,push=true \
-        --output type=image,name=$IMAGE_NAME:latest,push=true \
-        --output type=image,name=$IMAGE_NAME:$VERSION,push=true
+    # 多平台构建并推送
+    - docker buildx build \
+        --platform $PLATFORMS \
+        --build-arg HTTP_PROXY=$PROXY_URL \
+        --build-arg HTTPS_PROXY=$PROXY_URL \
+        --build-arg ALL_PROXY=$PROXY_URL \
+        --tag $IMAGE_NAME:$CI_COMMIT_SHA \
+        --tag $IMAGE_NAME:latest \
+        --tag $IMAGE_NAME:$VERSION \
+        --push .
   only:
     - main
     - develop
