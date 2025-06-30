@@ -28,10 +28,10 @@ RUN npm config set registry https://registry.npmmirror.com/
 
 # to store git revision in build
 RUN apk add --no-cache git
-COPY package.json package-lock.json ./
+COPY package.json ./
 COPY onnxruntime-linux-x64-gpu-1.20.1.tgz /tmp/
 ENV ORT_BIN_PATH=/tmp/onnxruntime-linux-x64-gpu-1.20.1.tgz
-RUN npm ci
+RUN npm install
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
