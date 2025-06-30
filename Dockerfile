@@ -43,6 +43,10 @@ FROM docker.1ms.run/library/python:3.11-slim-bookworm AS base
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && \
     pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
+# 替换 apt 镜像为清华镜像
+RUN sed -i 's|http://deb.debian.org/debian|https://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.debian.org/debian-security|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list
+
 # Use args
 ARG USE_CUDA
 ARG USE_OLLAMA

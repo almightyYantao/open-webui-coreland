@@ -208,7 +208,7 @@ async def sso_auth(request: Request, response: Response):
         except Exception as err:
             raise HTTPException(500, detail=ERROR_MESSAGES.DEFAULT(err))
 
-    user = Auths.authenticate_user_by_trusted_header(mail)        
+    user = Auths.authenticate_user_by_email(mail)        
     token = create_token(
                     data={"id": user.id},
                     expires_delta=parse_duration(
