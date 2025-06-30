@@ -29,10 +29,9 @@ RUN npm config set registry https://registry.npmmirror.com/
 # to store git revision in build
 RUN apk add --no-cache git
 COPY package.json package-lock.json ./
-# RUN apt-get update && apt-get install -y curl
-# RUN curl -LO https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-x64-gpu-1.20.1.tgz
-# ENV ORT_BIN_PATH=/tmp/onnxruntime-linux-x64-gpu-1.20.1.tgz
-RUN npm install
+COPY onnxruntime-linux-x64-gpu-1.20.1.tgz /tmp/
+ENV ORT_BIN_PATH=/tmp/onnxruntime-linux-x64-gpu-1.20.1.tgz
+RUN npm ci
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
