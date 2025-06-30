@@ -37,15 +37,19 @@ ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
 
 ######## WebUI backend ########
-FROM docker.1ms.run/library/python:3.11-slim-bookworm AS base
+FROM docker.1ms.run/library/python:3.11-bookworm AS base
 
 # 配置pip国内源
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && \
     pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
-# 替换 apt 镜像为清华镜像
-RUN sed -i 's|http://deb.debian.org/debian|https://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list && \
-    sed -i 's|http://security.debian.org/debian-security|https://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list
+# 覆盖 apt 源为清华镜像
+RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free\n\
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free\n\
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm-updates main contrib non-free\n\
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian bookworm-updates main contrib non-free" > /etc/apt/sources.list
 
 # Use args
 ARG USE_CUDA
