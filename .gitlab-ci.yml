@@ -12,7 +12,7 @@ build-push:
   stage: build-push
   image: docker.1ms.run/library/docker:24-cli
   tags:
-    - kube-runner
+    - kube-runner-qunhe
   before_script:
     # 安装jq获取版本
     - echo "http://mirrors.aliyun.com/alpine/v3.18/main" > /etc/apk/repositories
