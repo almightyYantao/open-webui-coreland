@@ -311,7 +311,15 @@ input[type='number'] {
 	@apply h-full min-h-fit max-h-full whitespace-pre-wrap;
 }
 
-.ProseMirror:focus {
+.ProseMirror pre {
+	background: #f6f6f6;
+    border-radius: 12px;
+    padding: 10px 0px;
+    margin-right: 10px;
+    white-space: pre-wrap;
+}
+
+.ProseMirror {
 	outline: none;
 }
 
