@@ -50,7 +50,7 @@ def search_searxng(
         "format": "json",
         "pageno": 1,
         "safesearch": safesearch,
-        "language": language,
+        # "language": language,
         "time_range": time_range,
         "categories": categories,
         "theme": "simple",
