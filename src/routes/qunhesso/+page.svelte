@@ -29,9 +29,9 @@
 	onMount(async () => {
 		const urlParams = new URLSearchParams(window.location.search);
 		const token = urlParams.get('token');
+		const cookie = urlParams.get('cookie');
 		if (token) {
 			// Do something with the token
-			console.log('Token:', token);
 			document.cookie = 'qunheinternalsso=' + token + '; path=/; Secure; HttpOnly; SameSite=None';
 			sso_auth_function(token).then(async (data) => {
 				await setSessionUser(data);

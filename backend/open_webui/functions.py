@@ -92,7 +92,7 @@ def get_back_url(request):
 
 def get_sso_redirect_url(request, next_url=''):
     local_next_url = next_url if next_url else get_current_url(request)
-    return f"https://kuauth.kujiale.com/loginpage?backurl={get_back_url(request)}&nexturl={local_next_url}"
+    return f"https://sso-gateway.kujiale.com/loginpage?backurl={get_back_url(request)}&nexturl={local_next_url}"
 
 def get_cookies_qunhe_token(request):
     cookies = request.cookies
@@ -108,6 +108,10 @@ async def get_function_models(request):
     for pipe in pipes:
         try:
             function_module = get_function_module_by_id(request, pipe.id)
+
+            has_user_valves = False
+            if hasattr(function_module, "UserValves"):
+                has_user_valves = True
 
             # Check if function is a manifold
             if hasattr(function_module, "pipes"):
@@ -147,6 +151,7 @@ async def get_function_models(request):
                             "created": pipe.created_at,
                             "owned_by": "openai",
                             "pipe": pipe_flag,
+                            "has_user_valves": has_user_valves,
                         }
                     )
             else:
@@ -164,6 +169,7 @@ async def get_function_models(request):
                         "created": pipe.created_at,
                         "owned_by": "openai",
                         "pipe": pipe_flag,
+                        "has_user_valves": has_user_valves,
                     }
                 )
         except Exception as e:
@@ -262,7 +268,7 @@ async def generate_function_chat_completion(
     oauth_token = None
     try:
         if request.cookies.get("oauth_session_id", None):
-            oauth_token = request.app.state.oauth_manager.get_oauth_token(
+            oauth_token = await request.app.state.oauth_manager.get_oauth_token(
                 user.id,
                 request.cookies.get("oauth_session_id", None),
             )
