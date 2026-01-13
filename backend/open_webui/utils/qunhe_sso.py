@@ -15,7 +15,7 @@ class SsoToken:
 
 TOKEN_ENCRYPT_KEY = b"1d6Ltt=r"  # 8 bytes key for DES
 log = logging.getLogger(__name__)
-log.setLevel(SRC_LOG_LEVELS["MAIN"])
+log.setLevel(SRC_LOG_LEVELS["RAG"])
 
 def des_decrypt(encrypt_str: str, des_key: bytes) -> str:
     try:
